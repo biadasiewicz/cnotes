@@ -3,12 +3,13 @@
 rm -f db.sqlite3 || true
 
 function test_output_after_write {
-    COUNT=$(sqlite3 db.sqlite3 "select * from Notes;"| wc -l)
+    OUTPUT=$(./cnotes read)
+    COUNT=$(echo "$OUTPUT" | wc -l)
     if [ $COUNT != "$2" ]; then
-        echo "$LINENO: '$1' printed an incorrect number of times, expected: $2"
+        echo "$LINENO: '$1' printed an incorrect number of times '$COUNT', expected: $2"
         exit
     fi
-    if [ $(sqlite3 db.sqlite3 "select * from Notes;"| grep ".*|$1|.*" | wc -l) != "$3" ]; then
+    if [ $(echo "$OUTPUT" | grep ".*|$1|.*" | wc -l) != "$3" ]; then
         echo "$LINENO: expected '$1' printed '$3' times"
         exit
     fi

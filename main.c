@@ -69,6 +69,32 @@ static void write_note(char const* note)
     sqlite3_finalize(res);
 }
 
+static int print_note(void *arg, int argc, char **values, char **columns)
+{
+    (void) arg; (void) argc; (void) columns;
+
+    printf("%s|%s|%s\n", values[0], values[1], values[2]);
+
+    return 0;
+}
+
+static void read_note()
+{
+    char const* sql;
+    char *err_msg;
+
+    sql = "SELECT * FROM Notes;";
+
+    open_database();
+
+    if(sqlite3_exec(db, sql, print_note, NULL, &err_msg) != SQLITE_OK)
+    {
+        print_error_msg(err_msg);
+        sqlite3_free(err_msg);
+        die();
+    }
+}
+
 int main(int argc, char **argv)
 {
     atexit(exit_cnotes);
@@ -85,6 +111,10 @@ int main(int argc, char **argv)
         }
 
         write_note(argv[2]);
+    }
+    else if(strcmp(argv[1], "read") == 0)
+    {
+        read_note();
     }
     else
     {
