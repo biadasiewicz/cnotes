@@ -1,7 +1,9 @@
 #include <sqlite3.h>
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define ERROR_INFO_FORMAT "[%s:%d] "
 #define ERROR_INFO_ARGS __FILE__, __LINE__
@@ -25,7 +27,9 @@ static void open_database()
         die_sqlite();
 
     sql = "CREATE TABLE IF NOT EXISTS Notes("
-          "ID INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time TIMESTAMP);";
+          "ID INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time TIMESTAMP);"
+          "CREATE TABLE IF NOT EXISTS Tags("
+          "ID INTEGER PRIMARY KEY AUTOINCREMENT, tagname TEXT UNIQUE NOT NULL);";
 
     if(sqlite3_exec(db, sql, NULL, NULL, &err_msg) != SQLITE_OK)
     {
@@ -38,6 +42,71 @@ static void open_database()
 static void exit_cnotes()
 {
     sqlite3_close(db);
+}
+
+static void
+insert_tag(char const* note, int note_id, regoff_t begin, regoff_t end)
+{
+    sqlite3_stmt *res;
+    char const* sql;
+    int rc;
+
+    sql = "INSERT INTO Tags(tagname) VALUES(?);";
+
+    if(sqlite3_prepare_v2(db, sql, -1, &res, NULL) != SQLITE_OK)
+    {
+        die_sqlite();
+    }
+
+    if(sqlite3_bind_text(res, 1, note + begin, end - begin, NULL) != SQLITE_OK)
+    {
+        sqlite3_finalize(res);
+        die_sqlite();
+    }
+
+    rc = sqlite3_step(res);
+    sqlite3_finalize(res);
+
+    if(rc == SQLITE_DONE || rc == SQLITE_CONSTRAINT ||
+       rc == SQLITE_CONSTRAINT_UNIQUE)
+    {
+        return;
+    }
+    else
+    {
+        die_sqlite();
+    }
+}
+
+static void insert_tags(char const* note, int note_id)
+{
+    char *err_msg; size_t count;
+    int rc;
+    regex_t regex;
+    regmatch_t matches[2];
+
+    rc = regcomp(&regex, "#\\([[:alnum:]]\\+\\)", 0);
+    if(rc)
+    {
+        count = regerror(rc, &regex, NULL, 0);
+        err_msg = malloc(count);
+        regerror(rc, &regex, err_msg, count);
+        print_error_msg(err_msg);
+        free(err_msg);
+        die();
+    }
+
+    while((rc = regexec(&regex, note, 2, matches, 0)) == 0)
+    {
+        insert_tag(note, note_id, matches[1].rm_so, matches[1].rm_eo);
+        note += matches[1].rm_eo;
+    }
+    regfree(&regex);
+
+    if(rc == REG_ESPACE)
+    {
+        die_msg(strerror(errno));
+    }
 }
 
 static void write_note(char const* note)
@@ -67,6 +136,8 @@ static void write_note(char const* note)
     }
 
     sqlite3_finalize(res);
+
+    insert_tags(note, sqlite3_last_insert_rowid(db));
 }
 
 static int print_note(void *arg, int argc, char **values, char **columns)
