@@ -6,7 +6,7 @@ function test_output_after_write {
     OUTPUT=$(./cnotes read)
     COUNT=$(echo "$OUTPUT" | wc -l)
     if [ $COUNT != "$2" ]; then
-        echo "$LINENO: '$1' printed an incorrect number of times '$COUNT', expected: $2"
+        echo "$LINENO: incorrect number of notes '$COUNT' expected '$2'"
         exit
     fi
     if [ $(echo "$OUTPUT" | grep ".*|$1|.*" | wc -l) != "$3" ]; then
@@ -21,7 +21,6 @@ test_output_after_write "first" 1 1
 test_output_after_write "second" 2 1
 ./cnotes write "second"
 test_output_after_write "second" 3 2
-
 
 
 #test tags inserted to database
@@ -73,3 +72,18 @@ function test_tags {
 }
 
 test_tags $'1|a\n2|b'
+
+
+#test removing note
+./cnotes write "#delete"
+COUNT_BEFORE=$(./cnotes tag "delete" | grep "delete" | wc -l)
+./cnotes delete 7
+COUNT=$(./cnotes tag "delete" | grep "delete" | wc -l)
+if [ $COUNT == $COUNT_BEFORE ]; then
+    echo "$LINENO: 'delete' tag not deleted: '$COUNT' but expected '$COUNT_BEFORE'"
+    exit
+fi
+
+if [ $(./cnotes tag | grep "delete" | wc -l) == "1" ]; then
+    echo "$LINENO: 'delete' tag not deleted from Tags table"
+fi

@@ -306,11 +306,95 @@ static void read_all_tags()
     }
 }
 
+static void delete_row_id(char const* sql, int id)
+{
+    sqlite3_stmt *res;
+
+    if(sqlite3_prepare_v2(db, sql, -1, &res, NULL) != SQLITE_OK)
+    {
+        die_sqlite();
+    }
+
+    sqlite3_bind_int(res, 1, id);
+
+    if(sqlite3_step(res) != SQLITE_DONE)
+    {
+        print_sqlite_error();
+        sqlite3_finalize(res);
+        die();
+    }
+
+    sqlite3_finalize(res);
+}
+
+static void delete_tag_if_unused()
+{
+    sqlite3_stmt *select_all_tags;
+    char const* sql;
+    int rc;
+
+    sql = "SELECT * FROM Tags;";
+
+    if(sqlite3_prepare_v2(db, sql, -1, &select_all_tags, NULL) != SQLITE_OK)
+    {
+        die_sqlite();
+    }
+
+    while((rc = sqlite3_step(select_all_tags)) == SQLITE_ROW)
+    {
+        sqlite3_stmt *select_tagged;
+        int tagid, result;
+
+        sql = "SELECT id FROM TagNoteMap WHERE tagid = ?;";
+        tagid = sqlite3_column_int(select_all_tags, 0);
+        if(sqlite3_prepare_v2(db, sql, -1, &select_tagged, NULL) != SQLITE_OK)
+        {
+            print_sqlite_error();
+            sqlite3_finalize(select_all_tags);
+            die();
+        }
+
+        sqlite3_bind_int(select_tagged, 1, tagid);
+
+        result = sqlite3_step(select_tagged);
+        if(result == SQLITE_DONE)
+        {
+            delete_row_id("DELETE FROM Tags WHERE id = ?;", tagid);
+        }
+        else if(result != SQLITE_ROW)
+        {
+            print_sqlite_error();
+            sqlite3_finalize(select_tagged);
+            sqlite3_finalize(select_all_tags);
+            die();
+        }
+
+        sqlite3_finalize(select_tagged);
+    }
+
+    if(rc != SQLITE_DONE)
+    {
+        print_sqlite_error();
+        sqlite3_finalize(select_all_tags);
+        die();
+    }
+
+    sqlite3_finalize(select_all_tags);
+}
+
+static void delete_note(int id)
+{
+    open_database();
+    delete_row_id("DELETE FROM Notes WHERE id = ?;", id);
+    delete_row_id("DELETE FROM TagNoteMap WHERE noteid = ?;", id);
+    delete_tag_if_unused();
+}
+
 int main(int argc, char **argv)
 {
     atexit(exit_cnotes);
 
-    if(argc < 2 || (argc >= 2 && strcmp(argv[1], "help") == 0))
+    if(argc < 2 || strcmp(argv[1], "help") == 0)
     {
         printf("help message\n");
     }
@@ -337,6 +421,15 @@ int main(int argc, char **argv)
         {
             read_all_tags();
         }
+    }
+    else if(strcmp(argv[1], "delete") == 0)
+    {
+        if(argc < 3)
+        {
+            die_msg("too few arguments");
+        }
+
+        delete_note(atoi(argv[2]));
     }
     else
     {
