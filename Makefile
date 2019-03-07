@@ -11,3 +11,8 @@ test: $(BIN)
 
 clean:
 	rm $(BIN)
+
+printdb:
+	sqlite3 db.sqlite3 "select * from Notes;"
+	sqlite3 db.sqlite3 "select * from Tags;"
+	sqlite3 db.sqlite3 "select * from TagNoteMap;"
