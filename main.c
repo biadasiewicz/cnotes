@@ -73,7 +73,7 @@ static void map_tag_to_note(int tag_id, int note_id)
     sqlite3_finalize(res);
 }
 
-static int get_tag_id(char const* note, regoff_t begin, regoff_t end)
+static int get_tag_id(char const* tag, size_t count)
 {
     sqlite3_stmt *res;
     char const* sql;
@@ -86,7 +86,7 @@ static int get_tag_id(char const* note, regoff_t begin, regoff_t end)
         return -1;
     }
 
-    sqlite3_bind_text(res, 1, note + begin, end - begin, NULL);
+    sqlite3_bind_text(res, 1, tag, count, NULL);
 
     rc = sqlite3_step(res);
     if(rc == SQLITE_ROW)
@@ -109,7 +109,7 @@ static int get_tag_id(char const* note, regoff_t begin, regoff_t end)
 }
 
 static void
-insert_tag(char const* note, int note_id, regoff_t begin, regoff_t end)
+insert_tag(char const* tag, size_t count, int note_id)
 {
     sqlite3_stmt *res;
     char const* sql;
@@ -122,29 +122,30 @@ insert_tag(char const* note, int note_id, regoff_t begin, regoff_t end)
         die_sqlite();
     }
 
-    if(sqlite3_bind_text(res, 1, note + begin, end - begin, NULL) != SQLITE_OK)
+    if(sqlite3_bind_text(res, 1, tag, count, NULL) != SQLITE_OK)
     {
         sqlite3_finalize(res);
         die_sqlite();
     }
 
     rc = sqlite3_step(res);
-    sqlite3_finalize(res);
-
     if(rc == SQLITE_DONE)
     {
         map_tag_to_note(sqlite3_last_insert_rowid(db), note_id);
     }
     else if(rc == SQLITE_CONSTRAINT || rc == SQLITE_CONSTRAINT_UNIQUE)
     {
-        int tag_id = get_tag_id(note, begin, end);
+        int tag_id = get_tag_id(tag, count);
         if(tag_id <= 0) return;
         map_tag_to_note(tag_id, note_id);
     }
     else
     {
+        sqlite3_finalize(res);
         die_sqlite();
     }
+
+    sqlite3_finalize(res);
 }
 
 static void insert_tags(char const* note, int note_id)
@@ -167,7 +168,8 @@ static void insert_tags(char const* note, int note_id)
 
     while((rc = regexec(&regex, note, 2, matches, 0)) == 0)
     {
-        insert_tag(note, note_id, matches[1].rm_so, matches[1].rm_eo);
+        insert_tag(note + matches[1].rm_so,
+                   matches[1].rm_eo - matches[1].rm_so, note_id);
         note += matches[1].rm_eo;
     }
     regfree(&regex);
@@ -243,7 +245,7 @@ static void read_tagged_notes(char const* tag)
 
     open_database();
 
-    tag_id = get_tag_id(tag, 0, strlen(tag));
+    tag_id = get_tag_id(tag, strlen(tag));
     if(tag_id < 0)
     {
         die();
