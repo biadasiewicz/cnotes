@@ -48,6 +48,41 @@ static void exit_cnotes()
     sqlite3_close(db);
 }
 
+static long calculate_hash(char const* s, size_t count)
+{
+    long hash = 0;
+    while(count--)
+        hash += *s--;
+    return hash;
+}
+
+static void encrypt_string(long key, char const* src, char *dest, size_t len)
+{
+    size_t i;
+    for(i = 0; i < len; ++i)
+        dest[i] = src[i] + key;
+    dest[len] = '\0';
+}
+
+static int encrypt_note(int encrypt, char const* note, char *str)
+{
+    char *env_key;
+    size_t len;
+    long key;
+
+    env_key = getenv("CNOTES");
+    if(env_key == NULL)
+    {
+        print_error_msg("failed to obtain CNOTES enviroment variable");
+        return 1;
+    }
+
+    key = calculate_hash(env_key, strlen(env_key));
+    len = strlen(note);
+    encrypt_string(encrypt ? key : -key, note, str, len);
+    return 0;
+}
+
 static void map_tag_to_note(int tag_id, int note_id)
 {
     sqlite3_stmt *res;
@@ -184,6 +219,8 @@ static void write_note(char const* note)
 {
     sqlite3_stmt *res;
     char const* sql;
+    char *encrypted_note;
+    size_t len;
 
     open_database();
 
@@ -194,7 +231,17 @@ static void write_note(char const* note)
         die_sqlite();
     }
 
-    if(sqlite3_bind_text(res, 1, note, -1, NULL) != SQLITE_OK)
+    len = strlen(note);
+    encrypted_note = malloc(len + 1);
+    if(encrypted_note == NULL || encrypt_note(1, note, encrypted_note))
+    {
+        free(encrypted_note);
+        sqlite3_finalize(res);
+        print_error_msg("failed to encrypt note");
+        die();
+    }
+
+    if(sqlite3_bind_blob(res, 1, encrypted_note, len + 1, free) != SQLITE_OK)
     {
         sqlite3_finalize(res);
         die_sqlite();
@@ -211,30 +258,58 @@ static void write_note(char const* note)
     insert_tags(note, sqlite3_last_insert_rowid(db));
 }
 
-static int print_note(void *arg, int argc, char **values, char **columns)
+static void print_next_note(sqlite3_stmt *stmt)
 {
-    (void) arg; (void) argc; (void) columns;
+    char *note;
 
-    printf("%s|%s|%s\n", values[0], values[1], values[2]);
+    note = malloc(sqlite3_column_bytes(stmt, 1));
+    if(note == NULL)
+    {
+        print_error_msg(strerror(errno));
+        sqlite3_finalize(stmt);
+        die();
+    }
 
-    return 0;
+    if(encrypt_note(0, sqlite3_column_blob(stmt, 1), note))
+    {
+        print_error_msg("failed to decrypt note");
+        free(note);
+        sqlite3_finalize(stmt);
+        die();
+    }
+
+    printf("%d|%s|%s\n",sqlite3_column_int(stmt, 0), note, sqlite3_column_text(stmt, 2));
+
+    free(note);
 }
 
 static void read_notes()
 {
     char const* sql;
-    char *err_msg;
-
-    sql = "SELECT * FROM Notes;";
+    sqlite3_stmt *stmt;
+    int rc;
 
     open_database();
 
-    if(sqlite3_exec(db, sql, print_note, NULL, &err_msg) != SQLITE_OK)
+    sql = "SELECT * FROM Notes;";
+    if(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
     {
-        print_error_msg(err_msg);
-        sqlite3_free(err_msg);
+        die_sqlite();
+    }
+
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+    {
+        print_next_note(stmt);
+    }
+
+    if(rc != SQLITE_DONE)
+    {
+        print_sqlite_error();
+        sqlite3_finalize(stmt);
         die();
     }
+
+    sqlite3_finalize(stmt);
 }
 
 static void read_tagged_notes(char const* tag)
@@ -267,9 +342,7 @@ static void read_tagged_notes(char const* tag)
 
     while((rc = sqlite3_step(res)) == SQLITE_ROW)
     {
-        printf("%s|%s|%s\n", sqlite3_column_text(res, 0),
-                             sqlite3_column_text(res, 1),
-                             sqlite3_column_text(res, 2));
+        print_next_note(res);
     }
 
     if(rc != SQLITE_DONE)

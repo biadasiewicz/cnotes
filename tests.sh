@@ -2,6 +2,8 @@
 
 rm -f db.sqlite3 || true
 
+export CNOTES=key
+
 function test_output_after_write {
     OUTPUT=$(./cnotes read)
     COUNT=$(echo "$OUTPUT" | wc -l)
@@ -9,8 +11,11 @@ function test_output_after_write {
         echo "$LINENO: incorrect number of notes '$COUNT' expected '$2'"
         exit
     fi
-    if [ $(echo "$OUTPUT" | grep ".*|$1|.*" | wc -l) != "$3" ]; then
-        echo "$LINENO: expected '$1' printed '$3' times"
+
+    COUNT=$(echo "$OUTPUT" | grep ".*|$1|.*" | wc -l)
+    if [ $COUNT != "$3" ]; then
+        echo "$LINENO: expected '$1' to be printed '$3' times in format '.*|$1|.*' but printed '$COUNT' times"
+        echo "$OUTPUT"
         exit
     fi
 }
