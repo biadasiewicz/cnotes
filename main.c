@@ -507,7 +507,13 @@ int main(int argc, char **argv)
 
     if(argc < 2 || strcmp(argv[1], "help") == 0)
     {
-        printf("help message\n");
+        printf("help - print this message\n"
+               "write [note] - write note with key=CNOTES\n"
+               "read - read all notes\n"
+               "read [id] - read specific note\n"
+               "tag - read all tags\n"
+               "tag [tag] - read all notes tagged with 'tag'\n"
+               "delete [id] - delete note\n");
     }
     else if(strcmp(argv[1], "write") == 0)
     {
