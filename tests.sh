@@ -28,6 +28,34 @@ test_output_after_write "second" 2 1
 test_output_after_write "second" 3 2
 
 
+function test_read_specific_note {
+    ID=$1
+    EXPECTED=$2
+    OUTPUT=$(./cnotes read $ID)
+    COUNT=$(echo "$OUTPUT" | grep "$ID|.*|.*" | wc -l)
+    if [ $COUNT != $EXPECTED ]; then
+        echo "$LINENO: expected id '$ID' printed '$EXPECTED' number of times, but printed '$COUNT'"
+        echo "$OUTPUT"
+        exit
+    fi
+}
+
+function test_read_note_id_0 {
+    OUTPUT=$(./cnotes read 0)
+    if [ "$OUTPUT" != "note id=0 does not exist" ]; then
+        echo "$LINENO: wrong output"
+        echo "$OUTPUT"
+        exit
+    fi
+}
+
+test_read_specific_note 1 1
+test_read_specific_note 2 1
+test_read_specific_note 3 1
+test_read_specific_note 4 0
+test_read_note_id_0
+
+
 #test tags inserted to database
 
 function test_tag_in_db {

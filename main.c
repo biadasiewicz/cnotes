@@ -312,6 +312,42 @@ static void read_notes()
     sqlite3_finalize(stmt);
 }
 
+static void read_note(int id)
+{
+    char const* sql;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    open_database();
+
+    sql = "SELECT * FROM Notes WHERE id = ?;";
+
+    if(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    {
+        die_sqlite();
+    }
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    rc = sqlite3_step(stmt);
+    if(rc == SQLITE_ROW)
+    {
+        print_next_note(stmt);
+    }
+    else if(rc == SQLITE_DONE)
+    {
+        printf("note id=%d does not exist\n", id);
+    }
+    else
+    {
+        print_sqlite_error();
+        sqlite3_finalize(stmt);
+        die();
+    }
+
+    sqlite3_finalize(stmt);
+}
+
 static void read_tagged_notes(char const* tag)
 {
     sqlite3_stmt *res;
@@ -484,7 +520,14 @@ int main(int argc, char **argv)
     }
     else if(strcmp(argv[1], "read") == 0)
     {
-        read_notes();
+        if(argc >= 3)
+        {
+            read_note(atoi(argv[2]));
+        }
+        else
+        {
+            read_notes();
+        }
     }
     else if(strcmp(argv[1], "tag") == 0)
     {
