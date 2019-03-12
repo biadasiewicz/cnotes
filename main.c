@@ -52,7 +52,7 @@ static long calculate_hash(char const* s, size_t count)
 {
     long hash = 0;
     while(count--)
-        hash += *s--;
+        hash += *s++;
     return hash;
 }
 
