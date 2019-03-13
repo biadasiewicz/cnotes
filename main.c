@@ -501,19 +501,59 @@ static void delete_note(int id)
     delete_tag_if_unused();
 }
 
+static void read_recent(int count)
+{
+    char const* sql;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    open_database();
+
+    sql = "SELECT * FROM Notes ORDER BY id DESC LIMIT ?;";
+
+    if(sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    {
+        die_sqlite();
+    }
+
+    sqlite3_bind_int(stmt, 1, count);
+
+    while((rc = sqlite3_step(stmt)) == SQLITE_ROW)
+    {
+        print_next_note(stmt);
+    }
+
+    if(rc != SQLITE_DONE)
+    {
+        print_sqlite_error();
+        sqlite3_finalize(stmt);
+        die();
+    }
+
+    sqlite3_finalize(stmt);
+}
+
 int main(int argc, char **argv)
 {
     atexit(exit_cnotes);
 
-    if(argc < 2 || strcmp(argv[1], "help") == 0)
+    if(argc < 2 || strcmp(argv[1], "recent") == 0)
     {
-        printf("help - print this message\n"
+        read_recent(argc > 2 ? atoi(argv[2]) : 5);
+    }
+    else if(strcmp(argv[1], "help") == 0)
+    {
+        printf(
+               "help - print this message\n"
                "write [note] - write note with key=CNOTES\n"
                "read - read all notes\n"
                "read [id] - read specific note\n"
                "tag - read all tags\n"
                "tag [tag] - read all notes tagged with 'tag'\n"
-               "delete [id] - delete note\n");
+               "delete [id] - delete note\n"
+               "recent - read 5 most recent notes\n"
+               "recent [count] - read 'count' most recent notes\n"
+               );
     }
     else if(strcmp(argv[1], "write") == 0)
     {
@@ -559,5 +599,6 @@ int main(int argc, char **argv)
     {
         die_msg("unknown command");
     }
+
     return EXIT_SUCCESS;
 }
