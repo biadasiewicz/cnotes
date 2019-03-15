@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -f db.sqlite3 || true
+rm -f test.sqlite3 || true
 
 export CNOTES=key
 
@@ -9,6 +9,7 @@ function test_output_after_write {
     COUNT=$(echo "$OUTPUT" | wc -l)
     if [ $COUNT != "$2" ]; then
         echo "$LINENO: incorrect number of notes '$COUNT' expected '$2'"
+        echo "$OUTPUT"
         exit
     fi
 
@@ -59,7 +60,7 @@ test_read_note_id_0
 #test tags inserted to database
 
 function test_tag_in_db {
-    OUTPUT=$(sqlite3 db.sqlite3 "SELECT * FROM Tags;")
+    OUTPUT=$(sqlite3 test.sqlite3 "SELECT * FROM Tags;")
     COUNT=$(echo "$OUTPUT" | grep "$1" | wc -l)
     if [ $COUNT != "1" ]; then
         echo "$LINENO: '$1' found '$COUNT' number of times: $OUTPUT"

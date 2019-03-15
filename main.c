@@ -7,24 +7,58 @@
 
 #define ERROR_INFO_FORMAT "[%s:%d] "
 #define ERROR_INFO_ARGS __FILE__, __LINE__
+#ifndef NDEBUG
 #define print_error_msg(msg) fprintf(stderr, ERROR_INFO_FORMAT "%s\n",\
         ERROR_INFO_ARGS, msg)
 #define print_sqlite_error() fprintf(stderr, ERROR_INFO_FORMAT "%s\n",\
         ERROR_INFO_ARGS, sqlite3_errmsg(db))
+#else
+#define print_error_msg(msg) fprintf(stderr, "%s\n", msg)
+#define print_sqlite_error() fprintf(stderr, "%s\n", sqlite3_errmsg(db))
+#endif
 #define die() exit(EXIT_FAILURE);
 #define die_msg(msg) do { print_error_msg(msg); die(); } while(0)
 #define die_sqlite() do { print_sqlite_error(); die(); } while(0)
 
 static sqlite3 *db;
-#define DB_FILEPATH "db.sqlite3"
+
+static char* get_db_path()
+{
+#ifdef NDEBUG
+    char const* filename = ".cnotes.sqlite3";
+    char *home, *path, *tmp;
+
+    home = getenv("HOME");
+    if(home == NULL)
+    {
+        die_msg("failed to get $HOME");
+    }
+
+    path = malloc(strlen(home) + 1 + strlen(filename) + 1);
+    tmp = path;
+    strcpy(path, home);
+    tmp += strlen(home);
+    strcpy(tmp, "/");
+    tmp += 1;
+    strcpy(tmp, filename);
+    tmp += strlen(filename);
+    *tmp = '\0';
+
+    return path;
+#else
+    return NULL;
+#endif
+}
 
 static void open_database()
 {
     char const* sql;
-    char *err_msg;
+    char *err_msg, *path;
 
-    if(sqlite3_open(DB_FILEPATH, &db) != SQLITE_OK)
+    path = get_db_path();
+    if(sqlite3_open(path != NULL ? path : "test.sqlite3", &db) != SQLITE_OK)
         die_sqlite();
+    free(path);
 
     sql = "CREATE TABLE IF NOT EXISTS Notes("
           "ID INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time TIMESTAMP);"
