@@ -312,7 +312,7 @@ static void print_next_note(sqlite3_stmt *stmt)
         die();
     }
 
-    printf("%d|%s|%s\n",sqlite3_column_int(stmt, 0), note, sqlite3_column_text(stmt, 2));
+    printf("%d|%s|%s\n",sqlite3_column_int(stmt, 0), sqlite3_column_text(stmt, 2), note);
 
     free(note);
 }

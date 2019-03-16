@@ -13,7 +13,7 @@ function test_output_after_write {
         exit
     fi
 
-    COUNT=$(echo "$OUTPUT" | grep ".*|$1|.*" | wc -l)
+    COUNT=$(echo "$OUTPUT" | grep ".*|.*|$1" | wc -l)
     if [ $COUNT != "$3" ]; then
         echo "$LINENO: expected '$1' to be printed '$3' times in format '.*|$1|.*' but printed '$COUNT' times"
         echo "$OUTPUT"
