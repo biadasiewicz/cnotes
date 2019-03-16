@@ -6,6 +6,8 @@
 #include <errno.h>
 #include <time.h>
 
+#define CNOTES_VERSION_STR "v1.1.0"
+
 #define ERROR_INFO_FORMAT "[%s:%d] "
 #define ERROR_INFO_ARGS __FILE__, __LINE__
 #ifndef NDEBUG
@@ -590,6 +592,7 @@ int main(int argc, char **argv)
     {
         printf(
                "help - print this message\n"
+               "version - print program version\n"
                "write [note] - write note with key=CNOTES\n"
                "read - read all notes\n"
                "read [id] - read specific note\n"
@@ -639,6 +642,10 @@ int main(int argc, char **argv)
         }
 
         delete_note(atoi(argv[2]));
+    }
+    else if(strcmp(argv[1], "version") == 0)
+    {
+        printf("%s\n", CNOTES_VERSION_STR);
     }
     else
     {
