@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 #define ERROR_INFO_FORMAT "[%s:%d] "
 #define ERROR_INFO_ARGS __FILE__, __LINE__
@@ -61,7 +62,7 @@ static void open_database()
     free(path);
 
     sql = "CREATE TABLE IF NOT EXISTS Notes("
-          "ID INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time TIMESTAMP);"
+          "ID INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time INTEGER);"
           "CREATE TABLE IF NOT EXISTS Tags("
           "ID INTEGER PRIMARY KEY AUTOINCREMENT, tagname TEXT UNIQUE NOT NULL);"
           "CREATE TABLE IF NOT EXISTS TagNoteMap("
@@ -258,7 +259,7 @@ static void write_note(char const* note)
 
     open_database();
 
-    sql = "INSERT INTO Notes(content, time) VALUES(?, CURRENT_TIMESTAMP);";
+    sql = "INSERT INTO Notes(content, time) VALUES(?, ?);";
 
     if(sqlite3_prepare(db, sql, -1, &res, NULL) != SQLITE_OK)
     {
@@ -281,6 +282,8 @@ static void write_note(char const* note)
         die_sqlite();
     }
 
+    sqlite3_bind_int64(res, 2, time(NULL));
+
     if(sqlite3_step(res) != SQLITE_DONE)
     {
         sqlite3_finalize(res);
@@ -295,6 +298,8 @@ static void write_note(char const* note)
 static void print_next_note(sqlite3_stmt *stmt)
 {
     char *note;
+    char formated_time[17]; /*YYYY/MM/DD HH:SS = 16 + null*/
+    time_t t;
 
     note = malloc(sqlite3_column_bytes(stmt, 1));
     if(note == NULL)
@@ -312,7 +317,13 @@ static void print_next_note(sqlite3_stmt *stmt)
         die();
     }
 
-    printf("%d|%s|%s\n",sqlite3_column_int(stmt, 0), sqlite3_column_text(stmt, 2), note);
+    t = sqlite3_column_int64(stmt, 2);
+    if(strftime(formated_time, 17, "%Y/%m/%d %H:%M", localtime(&t)) != 16)
+    {
+        strcpy(formated_time, "date format err");
+    }
+
+    printf("%d|%s|%s\n",sqlite3_column_int(stmt, 0), formated_time, note);
 
     free(note);
 }
